@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#4f46e5">
+<title>随机数生成器</title>
+<style>
+:root{color-scheme:light;--bg:#f5f6fb;--card:#fff;--ink:#171923;--muted:#6b7280;--accent:#4f46e5;--line:#e5e7eb}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#eef2ff 0%,var(--bg) 42%);font-family:system-ui,-apple-system,"Noto Sans SC",sans-serif;color:var(--ink);min-height:100vh}
+main{width:min(100%,560px);margin:0 auto;padding:26px 18px 40px}
+header{padding:8px 2px 20px} .eyebrow{font-size:12px;letter-spacing:.12em;color:var(--accent);font-weight:800}
+h1{font-size:29px;margin:7px 0 5px;letter-spacing:-.03em} .sub{margin:0;color:var(--muted);font-size:14px}
+.panel{background:var(--card);border:1px solid rgba(229,231,235,.9);border-radius:22px;padding:20px;box-shadow:0 10px 30px #1f2a4410;margin-bottom:15px}
+label{display:block;font-size:14px;font-weight:700;margin:0 0 8px}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+input[type=number]{width:100%;border:1px solid var(--line);border-radius:12px;padding:13px 12px;font-size:17px;background:#fbfbfe;color:var(--ink);outline:none}
+input:focus{border-color:var(--accent);box-shadow:0 0 0 3px #4f46e51a}
+.options{display:grid;gap:13px;margin-top:17px}.check{display:flex;align-items:center;gap:10px;font-size:14px;color:#374151}.check input{width:18px;height:18px;accent-color:var(--accent)}
+button{font:inherit;font-weight:750;border:0;border-radius:14px;padding:14px 16px;cursor:pointer}
+.primary{background:var(--accent);color:white;width:100%;font-size:16px;margin-top:18px;box-shadow:0 7px 16px #4f46e52e}
+.secondary{background:#eef2ff;color:var(--accent);padding:10px 13px;font-size:13px}
+button:active{transform:scale(.99)}.result-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+h2{font-size:17px;margin:0}.count{font-size:12px;color:var(--muted);background:#f3f4f6;padding:6px 9px;border-radius:99px}
+.results{display:grid;grid-template-columns:repeat(auto-fit,minmax(58px,1fr));gap:9px;margin-top:17px}
+.num{min-height:56px;display:grid;place-items:center;border-radius:14px;background:#f1f2ff;color:#3730a3;font-size:20px;font-weight:800;border:1px solid #e0e7ff;overflow-wrap:anywhere}
+.empty{color:var(--muted);font-size:14px;text-align:center;padding:24px 0 8px}
+.footer{color:var(--muted);font-size:12px;text-align:center;padding:10px}
+.error{color:#b91c1c;font-size:13px;margin-top:10px;display:none}
+@media(prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#111827;--card:#1f2937;--ink:#f9fafb;--muted:#9ca3af;--line:#374151}body{background:linear-gradient(160deg,#1e1b4b,#111827 45%)}input[type=number]{background:#111827;color:var(--ink)}.check{color:#d1d5db}.secondary{background:#312e81;color:#e0e7ff}.count{background:#374151}.num{background:#312e81;color:#e0e7ff;border-color:#4338ca}.panel{border-color:#374151}}
+</style>
+</head>
+<body>
+<main>
+<header><div class="eyebrow">SIMPLE · OFFLINE TOOL</div><h1>随机数生成器</h1><p class="sub">自定义范围、数量，一键生成随机数</p></header>
+<section class="panel">
+<div class="fields">
+<div><label for="min">最小值</label><input id="min" type="number" value="1" step="1"></div>
+<div><label for="max">最大值</label><input id="max" type="number" value="100" step="1"></div>
+<div><label for="quantity">生成数量</label><input id="quantity" type="number" value="6" min="1" max="500" step="1"></div>
+<div><label for="mode">生成方式</label><select id="mode" style="width:100%;padding:13px 10px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);font-size:14px"><option value="repeat">允许重复</option><option value="unique">不重复</option></select></div>
+</div>
+<div class="options">
+<label class="check"><input id="sort" type="checkbox">生成后从小到大排序</label>
+<label class="check"><input id="negative" type="checkbox" checked>允许负数范围</label>
+</div>
+<div id="error" class="error" role="alert"></div>
+<button id="generate" class="primary">生成随机数</button>
+</section>
+<section class="panel">
+<div class="result-head"><h2>生成结果</h2><span class="count" id="count">0 个数字</span></div>
+<div id="results" class="results"><div class="empty" style="grid-column:1/-1">设置好范围和数量，点击上方按钮</div></div>
+<div style="display:flex;gap:9px;margin-top:16px"><button id="copy" class="secondary" style="flex:1">复制结果</button><button id="clear" class="secondary" style="flex:1">清空</button></div>
+</section>
+<div class="footer">完全离线运行 · 结果仅保存在当前页面</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let last=[];
+function showError(msg){$('error').textContent=msg;$('error').style.display=msg?'block':'none'}
+function randInt(min,max){const range=max-min+1;if(range<=0)return min;const a=new Uint32Array(1);const limit=Math.floor(4294967296/range)*range;let x;do{crypto.getRandomValues(a);x=a[0]}while(x>=limit);return min+(x%range)}
+function generate(){
+ showError('');
+ const min=Number($('min').value),max=Number($('max').value),q=Number($('quantity').value);
+ if(!$('min').value||!$('max').value||!$('quantity').value||!Number.isSafeInteger(min)||!Number.isSafeInteger(max)||!Number.isSafeInteger(q)){showError('请输入有效的整数。');return}
+ if(min>max){showError('最小值不能大于最大值。');return}
+ if(q<1||q>500){showError('生成数量请设置为 1–500。');return}
+ if(!$('negative').checked&&min<0){showError('已关闭负数范围，请把最小值设置为 0 或更大。');return}
+ const span=max-min+1;
+ if(!Number.isSafeInteger(span)||span<1){showError('范围过大，请缩小数值范围。');return}
+ if($('mode').value==='unique'&&q>span){showError('不重复模式下，生成数量不能超过范围内可用整数的数量。');return}
+ last=[];
+ if($('mode').value==='unique'){
+   const set=new Set();
+   while(set.size<q)set.add(randInt(min,max));
+   last=[...set];
+ }else{for(let i=0;i<q;i++)last.push(randInt(min,max))}
+ if($('sort').checked)last.sort((a,b)=>a-b);
+ render();
+}
+function render(){
+ $('count').textContent=last.length+' 个数字';
+ const root=$('results');root.innerHTML='';
+ if(!last.length){root.innerHTML='<div class="empty" style="grid-column:1/-1">暂无结果</div>';return}
+ const frag=document.createDocumentFragment();
+ last.forEach((n,i)=>{const el=document.createElement('div');el.className='num';el.textContent=n;el.title='第 '+(i+1)+' 个';frag.appendChild(el)});
+ root.appendChild(frag);
+}
+$('generate').addEventListener('click',generate);
+$('clear').addEventListener('click',()=>{last=[];showError('');render()});
+$('copy').addEventListener('click',async()=>{
+ if(!last.length){showError('还没有可复制的结果。');return}
+ const text=last.join(', ');
+ try{await navigator.clipboard.writeText(text);$('copy').textContent='已复制！';setTimeout(()=>$('copy').textContent='复制结果',1400)}
+ catch(e){const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();$('copy').textContent='已复制！';setTimeout(()=>$('copy').textContent='复制结果',1400)}
+});
+$('negative').addEventListener('change',()=>{if(!$('negative').checked&&Number($('min').value)<0){$('min').value=0}});
+</script>
+</body>
+</html>
